@@ -125,6 +125,38 @@ export interface OCENPayload {
   format: "OCEN-compatible-v1";
 }
 
+/** ---- AI Credit Copilot chat ---- */
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  source: "anthropic" | "fallback";
+}
+
+/** ---- Portfolio summary returned by GET /api/msme/portfolio/summary ---- */
+
+export interface PortfolioMsmeSummary {
+  id: string;
+  name: string;
+  businessType: string;
+  composite_score: number;
+  band: ScoreBand;
+  top_risk_flag: string | null;
+}
+
+export interface PortfolioSummary {
+  total_assessed: number;
+  average_composite_score: number;
+  high_risk_pct: number; // % of MSMEs in the Poor or Bad bands
+  band_counts: Record<ScoreBand, number>;
+  business_type_counts: Record<string, number>;
+  msmes: PortfolioMsmeSummary[];
+}
+
 /** ---- Full assessment response returned by POST /api/msme/:id/assess ---- */
 
 export interface AssessmentResponse {

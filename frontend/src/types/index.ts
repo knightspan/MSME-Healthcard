@@ -56,6 +56,34 @@ export interface OCENPayload {
   format: "OCEN-compatible-v1";
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  source: "anthropic" | "fallback";
+}
+
+export interface PortfolioMsmeSummary {
+  id: string;
+  name: string;
+  businessType: string;
+  composite_score: number;
+  band: ScoreBand;
+  top_risk_flag: string | null;
+}
+
+export interface PortfolioSummary {
+  total_assessed: number;
+  average_composite_score: number;
+  high_risk_pct: number;
+  band_counts: Record<ScoreBand, number>;
+  business_type_counts: Record<string, number>;
+  msmes: PortfolioMsmeSummary[];
+}
+
 export interface AssessmentResponse {
   profile: MSMEProfileMeta;
   normalized: NormalizedMSMEData;

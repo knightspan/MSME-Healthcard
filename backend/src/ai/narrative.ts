@@ -1,19 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { MSMEProfileMeta, NarrativeResult, NormalizedMSMEData, ScoreResult } from "../types/index.js";
+import { ANTHROPIC_MODEL, getAnthropicClient } from "./anthropicClient.js";
 
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const ANTHROPIC_TIMEOUT_MS = 4500; // keeps the overall /assess endpoint close to the <5s target
-
-let client: Anthropic | null = null;
-
-function getClient(): Anthropic | null {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  if (!client) {
-    client = new Anthropic({ apiKey, timeout: ANTHROPIC_TIMEOUT_MS });
-  }
-  return client;
-}
 
 const SYSTEM_PROMPT = `You are an experienced bank credit underwriter reviewing an MSME's alternate-data financial health assessment (built from GST filings, UPI transactions, Account Aggregator bank statement data, and EPFO payroll records) for a loan eligibility review.
 
@@ -105,7 +93,7 @@ export async function generateNarrative(
   normalized: NormalizedMSMEData,
   score: ScoreResult
 ): Promise<NarrativeResult> {
-  const anthropic = getClient();
+  const anthropic = getAnthropicClient(ANTHROPIC_TIMEOUT_MS);
   if (!anthropic) {
     return buildFallback(score);
   }
