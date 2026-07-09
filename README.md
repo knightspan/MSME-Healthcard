@@ -10,7 +10,9 @@ onboard **New-to-Credit (NTC) and New-to-Bank (NTB)** MSMEs that lack traditiona
 traditional underwriting would miss.
 
 The whole pipeline (fetch data → normalize → score → AI narrative → OCEN-formatted output) runs
-in well under 5 seconds per assessment.
+in well under 5 seconds per assessment. On top of that core card, the demo also includes an
+**AI Credit Copilot**, a **portfolio view** across all three profiles, a **PDF credit memo**
+export, and a live **what-if scenario simulator**.
 
 ## What makes the demo convincing
 
@@ -26,11 +28,65 @@ of the thesis:
 This is the core proof point: **alternate data catches what paperwork misses**, in both
 directions.
 
+## Product features
+
+### Assessment dashboard
+
+Pick a profile, click **Run Assessment**, and get the full Financial Health Card: composite
+gauge, 4-pillar radar, pillar breakdown, AI underwriter narrative, risk/strength flags, and
+OCEN-compatible JSON.
+
+### AI Credit Copilot
+
+A collapsible chat panel beside the assessment. Each turn re-runs normalize + score so answers
+are grounded in fresh data, then calls Anthropic with the full score object (composite, pillars,
+risk/strength flags, normalized inputs) as context. Starter chips include:
+
+- "Why is this MSME risky?"
+- "Should we approve this loan?"
+- "What's the biggest strength here?"
+- "What would improve this score fastest?"
+
+Conversation history stays in React state for the demo (not persisted). If `ANTHROPIC_API_KEY`
+is unset, the copilot falls back to a data-only summary — same pattern as the narrative layer.
+
+### Portfolio view
+
+A **Portfolio** tab that scores all three mock profiles and shows:
+
+- Summary cards: average composite score, % high-risk (Poor + Bad), total assessed
+- Bar chart of score distribution across bands (Recharts)
+- Sortable table of all MSMEs with score, band, and top risk flag
+- Click a row to jump straight into that MSME's full assessment
+
+### Credit memo PDF
+
+**Download Credit Memo** on the assessment view hits `GET /api/msme/:id/memo` and downloads a
+bank-style PDF (via PDFKit) with:
+
+- Header (business name, date)
+- Composite score + band
+- Pillar breakdown table
+- AI narrative (strength / risk / tips)
+- Risk & strength flags
+- Recommended action derived from band (approve / conditional approve with monitoring / decline
+  or further manual review)
+- Footer noting data sources used
+
+### What-if scenario simulator
+
+Sliders for the key normalized inputs (`monthly_revenue`, `revenue_variance_pct`,
+`filing_regularity_pct`, `avg_bank_balance`, `bounced_payment_count`,
+`payroll_headcount_trend_pct`), pre-filled from the selected MSME. Debounced calls to
+`POST /api/msme/:id/simulate` re-run the **existing** `computeScore()` only — no scoring-engine
+changes — and update the gauge/radar live with a delta vs. the actual score (e.g. `+9.3` /
+`-4.1`).
+
 ## Architecture
 
 ```
 frontend/  React + Vite + TypeScript + Tailwind CSS + Recharts
-backend/   Node.js + Express + TypeScript
+backend/   Node.js + Express + TypeScript + PDFKit + Anthropic SDK
 ```
 
 ### Provider-agnostic adapter layer (the key technical differentiator)
@@ -83,17 +139,23 @@ interface DataSourceAdapter {
    normalized data, so the UI, the flags, and the AI narrative are always internally consistent.
 
    All scoring logic is pure and unit-tested (`backend/src/scoring/scoringEngine.test.ts`),
-   verifying the three profiles land in their expected bands.
+   verifying the three profiles land in their expected bands. The what-if simulator and
+   portfolio/copilot/memo routes call this same `computeScore()` — they do not reimplement it.
 3. **AI narrative layer** (`backend/src/ai/narrative.ts`) — calls the Anthropic API
    (`claude-sonnet-4-6`) server-side only, with a system prompt requiring exactly one named
    strength (with a real number from the data), one named risk (ditto), and two specific
    improvement recommendations — parsed into structured JSON. If the API key is missing, the
    call errors, or it times out, the layer **falls back to a locally-derived narrative** built
    from the score's own flags — the assessment pipeline never crashes because of the AI call.
-4. **OCEN adapter** (`backend/src/ocen/ocenAdapter.ts`) — reformats the final score into an
+4. **AI Credit Copilot** (`backend/src/ai/copilot.ts`) — conversational underwriting Q&A over
+   the same grounded score context; shares the Anthropic client helper in
+   `backend/src/ai/anthropicClient.ts`.
+5. **OCEN adapter** (`backend/src/ocen/ocenAdapter.ts`) — reformats the final score into an
    OCEN-style structured payload (`applicant_id`, `composite_score`, `risk_band`,
    `recommended_action`, `score_breakdown`, `data_sources_used`, ...) for handoff to a Loan
    Service Provider, viewable and copyable from the frontend.
+6. **Credit memo PDF** (`backend/src/pdf/creditMemoPdf.ts`) — formats the assessment into a
+   downloadable bank-style memo via PDFKit.
 
 ### API routes
 
@@ -102,6 +164,10 @@ interface DataSourceAdapter {
 | `GET /api/msme/profiles` | Lists the 3 demo MSME profiles + current `DATA_MODE` |
 | `POST /api/msme/:id/assess` | Runs the full pipeline end-to-end and returns everything the dashboard needs |
 | `GET /api/msme/:id/ocen-payload` | Returns just the OCEN-formatted JSON |
+| `POST /api/msme/:id/chat` | AI Credit Copilot — body `{ message, conversationHistory }`; re-runs normalize + score, then returns `{ reply, source }` |
+| `GET /api/msme/portfolio/summary` | Scores all 3 profiles; returns averages, band/business-type counts, high-risk %, and per-MSME summaries |
+| `GET /api/msme/:id/memo` | Streams a PDF credit memo (`application/pdf` attachment) |
+| `POST /api/msme/:id/simulate` | Body: full `NormalizedMSMEData` overrides; returns `ScoreResult` from existing `computeScore()` |
 
 ## Running locally
 
@@ -126,13 +192,19 @@ npm install
 npm run dev             # starts on http://localhost:5173, proxies /api to :4000
 ```
 
-Open `http://localhost:5173`, pick a profile, click **Run Assessment**.
+Open `http://localhost:5173`:
+
+1. On **Assessment**, pick a profile and click **Run Assessment**.
+2. Use **Download Credit Memo**, the **AI Credit Copilot** panel, and the **What-If Scenario
+   Simulator** on the results view.
+3. Switch to the **Portfolio** tab for the cross-profile summary; click a table row to open that
+   MSME's assessment.
 
 ### Environment variables (`backend/.env`)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | _(empty)_ | Used server-side only for the AI narrative layer. **Never exposed to the client.** If unset, narratives gracefully fall back to a locally-derived summary instead of crashing. |
+| `ANTHROPIC_API_KEY` | _(empty)_ | Used server-side only for the AI narrative layer and Credit Copilot. **Never exposed to the client.** If unset, both fall back to locally-derived text instead of crashing. |
 | `DATA_MODE` | `mock` | `mock` uses the built-in `MockAdapter`; `live` switches to the stubbed `LiveAdapter` for future bank sandbox integration. |
 | `PORT` | `4000` | Port the Express API listens on. |
 
@@ -145,17 +217,19 @@ backend/
     data/             Mock GST/UPI/AA/EPFO data + the 3 profile definitions
     normalization/    Raw adapter output -> unified schema
     scoring/          The 4-pillar weighted scoring engine + constants + unit tests
-    ai/               Anthropic-powered underwriting narrative (with fallback)
+    ai/               Shared Anthropic client, underwriting narrative, Credit Copilot
+    pdf/              Credit memo PDF builder (PDFKit)
     ocen/             OCEN-style payload formatter
-    routes/           Express route handlers
+    routes/           Express route handlers (assess, chat, portfolio, memo, simulate, …)
     types/            Shared TypeScript types
     server.ts         Express app entrypoint
 frontend/
   src/
-    components/       ScoreGauge, PillarRadarChart, NarrativeCard, OcenPanel, etc.
-    lib/               API client, band color helpers
+    components/       ScoreGauge, PillarRadarChart, NarrativeCard, ChatPanel,
+                      PortfolioView, WhatIfSimulator, OcenPanel, etc.
+    lib/               API client, debounce hook, band color helpers
     types/             Shared TypeScript types (mirrors backend response shapes)
-    App.tsx           Main dashboard
+    App.tsx           Assessment + Portfolio tabs and dashboard layout
 ```
 
 ## Notes & assumptions
@@ -163,10 +237,14 @@ frontend/
 - **In-memory data only.** There is no database — mock data lives in TypeScript files under
   `backend/src/data/`. This was an explicit choice for hackathon speed; the normalization layer
   already treats all data as coming through the adapter interface, so swapping in Postgres later
-  would only mean changing what backs the adapter, not any downstream logic.
+  would only mean changing what backs the adapter, not any downstream logic. Copilot chat history
+  is likewise in-memory on the client only.
 - **`LiveAdapter` is intentionally unimplemented** — bank sandbox credentials aren't available
   yet. It throws clear, descriptive errors if invoked, with `TODO` comments marking exactly what
   each method needs once a provider is chosen.
 - **Model name**: the AI layer calls `claude-sonnet-4-6` exactly as specified. If that model ID
   is renamed/unavailable when you run this, update the constant in
-  `backend/src/ai/narrative.ts`.
+  `backend/src/ai/anthropicClient.ts` (shared by narrative + copilot).
+- **No scoring-engine forks.** Portfolio, chat, memo, and simulate all reuse
+  `normalizeMSMEData` / `computeScore` / `generateNarrative` as appropriate — the simulator in
+  particular only overrides normalized inputs and calls `computeScore()` unchanged.
