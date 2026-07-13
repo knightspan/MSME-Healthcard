@@ -289,11 +289,18 @@ export default function App() {
       <div className="flex-1 flex flex-col ml-64 min-h-screen">
         
         {/* Top AppBar */}
-        <header className="bg-white border-b border-slate-200 h-16 w-full px-6 sticky top-0 z-10 flex justify-between items-center select-none">
+        <header className="bg-white border-b border-slate-200 min-h-16 w-full px-6 sticky top-0 z-10 flex justify-between items-center select-none py-2.5">
           {/* Left panel - Search Portfolios */}
-          <div className="flex items-center space-x-4 flex-1">
-            <h2 className="text-base font-bold text-slate-800 hidden md:block uppercase tracking-wider">RiskIntel MSME</h2>
-            <div className="relative w-64">
+          <div className="flex items-center space-x-5 flex-1 min-w-0">
+            <div className="hidden md:block shrink-0">
+              <h2 className="font-display text-[15px] font-semibold text-slate-900 tracking-tight leading-none">
+                IDBI MSME Financial Health Card
+              </h2>
+              <p className="mt-1 text-[10px] font-medium italic text-slate-500 tracking-wide">
+                Made by Team Anvay
+              </p>
+            </div>
+            <div className="relative w-64 shrink">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <Search className="w-4 h-4" />
               </span>
@@ -390,7 +397,7 @@ export default function App() {
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3wZa6hG5oGvSH2EYbA-Zvv5Xxy7CrEJvFz5_Bed5SOevPERhonmy6Ezdo5fUFBNBJ3FvM5ShmYJxwykBT7a_k12k3ylpmXutWRMYgICYAIMsDCSWbX1usrSKsTGDryicUerCiqgEtjlhwhLdgmjlaU1DxMh5_DqAP98-u7ch_RXj6goMU6xqhTK0sKjGIlz60NDu9Hf4xZbPs5_OTG9OER7eeNJCVQrdTdoXFlsrWTs8DHSVxpDdRTKaXjFqs80aqxwaDx1ypiyc"
                 />
               </div>
-              <span className="text-xs font-semibold text-slate-800 hidden lg:inline">J. Sterling (VP Lending)</span>
+              <span className="text-xs font-semibold text-slate-800 hidden lg:inline">Team Anvay · Bank Lending</span>
             </div>
           </div>
         </header>
@@ -856,7 +863,7 @@ export default function App() {
                     <div className="text-right text-[10px] font-bold text-slate-500 space-y-1 font-mono">
                       <div>DATE: Oct 24, 2026</div>
                       <div>CASE ID: CR-992-B4</div>
-                      <div>OFFICER: J. Sterling</div>
+                      <div>OFFICER: Team Anvay</div>
                     </div>
                   </div>
 

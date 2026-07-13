@@ -1,6 +1,6 @@
 {
-  "name": "RiskIntel MSME",
-  "description": "Institutional banking credit underwriting, ALT-data insights, and credit memorandum tool for MSME lenders.",
+  "name": "IDBI MSME Financial Health Card",
+  "description": "Alternate-data credit assessment platform for MSME bank lending — explainable scoring, XGBoost PD + SHAP, AI credit copilot, and OCEN-ready output. Built by Team Anvay for the IDBI Innovation Hackathon.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

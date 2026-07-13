@@ -1,0 +1,10 @@
+# Optional: deploy the Python ML service on Railway.
+# After deploy, set ML_SERVICE_URL on the Vercel project to this service's public URL.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

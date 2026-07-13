@@ -26,19 +26,17 @@ export default function Sidebar({ currentScreen, onScreenChange, onOpenNewAssess
 
   return (
     <aside className="w-64 border-r border-slate-800 bg-[#0F172A] flex flex-col h-screen fixed left-0 top-0 z-20">
-      {/* Header Profile Area */}
-      <div className="p-6 border-b border-slate-800/60 flex items-center space-x-3">
-        <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-700 bg-slate-800 shrink-0">
-          <img 
-            alt="Bank Officer Profile" 
-            className="w-full h-full object-cover" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDr-8UpAWC4wK9ubVmztbMcCMMHMqPGO3SmV4wsKXBtvyT2ymAjihUt_z3MkPuygGDCOLcEfEFXjKa_KUuhZ8MvScnJ7hrCrWigkpWOa4DAs6S0QJv-3sbxvQ94ffU5OZQSuYP37gRaWKGGOGTWJBTgJMEGiVimMLu5iNJaVV_7djT6JY7dBPYAK2WPnPxz_r5vyEXMbZYxgkqZnRtl8_fQ5CHxq8i3Dj7zw2GsMNXRFJVHgRaWE__oIR4vNx8f49st39VwpR1Ogpw"
-          />
-        </div>
-        <div>
-          <h1 className="font-sans font-bold text-white text-base leading-tight">RiskIntel MSME</h1>
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Institutional Banking</p>
-        </div>
+      {/* Brand mark */}
+      <div className="px-5 py-5 border-b border-slate-800/60">
+        <p className="font-display text-[15px] font-semibold tracking-tight text-white leading-snug">
+          IDBI MSME
+        </p>
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-400/90">
+          Bank Lending
+        </p>
+        <p className="mt-2 text-[10px] font-medium italic text-slate-500 tracking-wide">
+          Made by Team Anvay
+        </p>
       </div>
 
       {/* Main Navigation Links */}

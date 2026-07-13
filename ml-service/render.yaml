@@ -1,0 +1,12 @@
+# Example Render Blueprint for the ML microservice.
+# After deploy, set Vercel env ML_SERVICE_URL=https://<your-ml-service>.onrender.com
+services:
+  - type: web
+    name: idbi-msme-ml-service
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"

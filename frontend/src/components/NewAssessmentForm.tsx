@@ -105,7 +105,7 @@ export default function NewAssessmentForm({ onSubmit, loading }: NewAssessmentFo
                 type="text"
                 value={apiUrl}
                 onChange={(e) => setApiUrlState(e.target.value)}
-                placeholder="http://localhost:8000/api/v1/score"
+                placeholder="/api/v1/score"
                 className="flex-1 bg-white border border-slate-200 rounded px-3 py-1.5 text-xs text-slate-800 font-mono focus:outline-none focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7]"
               />
               <button

@@ -3,8 +3,12 @@ dist/
 .env
 *.log
 .DS_Store
+.vercel
 
 # Python (ml-service)
 .venv/
 __pycache__/
 *.pyc
+
+.vercel
+.env*

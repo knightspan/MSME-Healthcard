@@ -6,8 +6,8 @@ import type { MLRiskResult, NormalizedMSMEData, ScoreResult } from "../types/ind
 
 // ============================================================================
 // This router adapts the ad-hoc "Interactive Risk Underwriter" form on the
-// RiskIntel MSME frontend (POST /api/v1/score, POST /api/v1/chat) onto the
-// SAME real pipeline the profile-based routes use: the rule-based
+// IDBI MSME Financial Health Card frontend (POST /api/v1/score, POST /api/v1/chat)
+// onto the SAME real pipeline the profile-based routes use: the rule-based
 // computeScore() engine AND the actual trained XGBoost PD model + SHAP
 // (via getMLRisk() -> ml-service). Nothing here reimplements scoring or ML
 // inference — it only bridges input/output shapes.

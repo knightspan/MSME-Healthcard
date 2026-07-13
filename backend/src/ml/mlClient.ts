@@ -1,6 +1,16 @@
 import type { MLRiskResult, NormalizedMSMEData } from "../types/index.js";
 
-const ML_SERVICE_URL = (process.env.ML_SERVICE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+const configuredUrl = process.env.ML_SERVICE_URL?.trim();
+// On Vercel (or any cloud host) never silently fall back to localhost — that
+// just burns the request timeout. Prefer an explicit unset → graceful fallback.
+const ML_SERVICE_URL = (
+  configuredUrl && configuredUrl.length > 0
+    ? configuredUrl
+    : process.env.VERCEL
+      ? ""
+      : "http://localhost:8000"
+).replace(/\/$/, "");
+
 const ML_TIMEOUT_MS = 4000;
 
 function buildFallback(reason: string): MLRiskResult {
@@ -24,6 +34,12 @@ function buildFallback(reason: string): MLRiskResult {
  * the rule-based score alone rather than failing the whole assessment.
  */
 export async function getMLRisk(normalized: NormalizedMSMEData): Promise<MLRiskResult> {
+  if (!ML_SERVICE_URL) {
+    return buildFallback(
+      "ML_SERVICE_URL is not configured (set it to your hosted ml-service URL for PD/SHAP on Vercel)"
+    );
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ML_TIMEOUT_MS);
 
