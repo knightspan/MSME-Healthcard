@@ -1,15 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "frontend/dist",
   "installCommand": "npm install && npm install --prefix backend && npm install --prefix frontend",
   "framework": null,
   "functions": {
     "api/index.ts": {
-      "runtime": "nodejs20.x",
       "maxDuration": 60,
-      "memory": 1024,
       "includeFiles": "{backend/dist/**,backend/node_modules/**}"
     }
   },
