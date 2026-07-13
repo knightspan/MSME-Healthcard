@@ -1,11 +1,19 @@
 import PDFDocument from "pdfkit";
 import type {
+  MLRiskResult,
   MSMEProfileMeta,
   NarrativeResult,
   NormalizedMSMEData,
   ScoreBand,
   ScoreResult,
 } from "../types/index.js";
+
+const ML_BAND_COLORS: Record<string, string> = {
+  Low: "#15803d",
+  Moderate: "#65a30d",
+  Elevated: "#f97316",
+  High: "#dc2626",
+};
 
 const BAND_COLORS: Record<ScoreBand, string> = {
   Poor: "#dc2626",
@@ -116,6 +124,61 @@ function addFooter(doc: PDFKit.PDFDocument, normalized: NormalizedMSMEData, page
   );
 }
 
+function renderMLRiskSection(doc: PDFKit.PDFDocument, mlRisk: MLRiskResult, pageWidth: number): void {
+  sectionTitle(doc, "ML Risk Layer — Probability of Default (XGBoost + SHAP)");
+
+  if (!mlRisk.available || mlRisk.probability_of_default_pct === null) {
+    doc
+      .font("Helvetica-Oblique")
+      .fontSize(9.5)
+      .fillColor("#94a3b8")
+      .text(`ML risk service was unavailable for this assessment (${mlRisk.fallback_reason ?? "unknown reason"}). Recommendation relies on the rule-based score above only.`);
+    doc.moveDown(0.5);
+    return;
+  }
+
+  const bandColor = ML_BAND_COLORS[mlRisk.risk_band ?? "Moderate"] ?? "#64748b";
+  const startY = doc.y;
+  doc.font("Helvetica-Bold").fontSize(22).fillColor("#0f172a").text(`${mlRisk.probability_of_default_pct}% PD`, doc.x, startY, {
+    continued: false,
+  });
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(bandColor).text(`${(mlRisk.risk_band ?? "").toUpperCase()} ML RISK BAND`, {
+    characterSpacing: 0.5,
+  });
+  doc.font("Helvetica").fontSize(9).fillColor("#64748b").text(`Model confidence: ${mlRisk.confidence_pct}%  |  Model: ${mlRisk.model_version}`);
+  doc.moveDown(0.4);
+
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#b91c1c").text("TOP RISK-INCREASING FACTORS (SHAP)", { characterSpacing: 0.3 });
+  doc.font("Helvetica").fontSize(9.5).fillColor("#1f2937");
+  if (mlRisk.top_risk_increasing_features.length === 0) {
+    doc.text("None identified.");
+  } else {
+    mlRisk.top_risk_increasing_features.forEach((f) => doc.text(`\u2022  ${f.feature}`, { indent: 6 }));
+  }
+  doc.moveDown(0.3);
+
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#15803d").text("TOP RISK-REDUCING FACTORS (SHAP)", { characterSpacing: 0.3 });
+  doc.font("Helvetica").fontSize(9.5).fillColor("#1f2937");
+  if (mlRisk.top_risk_reducing_features.length === 0) {
+    doc.text("None identified.");
+  } else {
+    mlRisk.top_risk_reducing_features.forEach((f) => doc.text(`\u2022  ${f.feature}`, { indent: 6 }));
+  }
+  doc.moveDown(0.4);
+
+  doc
+    .font("Helvetica-Oblique")
+    .fontSize(7.5)
+    .fillColor("#94a3b8")
+    .text(
+      "Demonstration model trained on a public bureau-style dataset (Give Me Some Credit, Kaggle) with alt-data " +
+        "translated into its feature space via a documented heuristic bridge. Not trained on IDBI's historical " +
+        "repayment or alternate-data records. In production this model would be retrained directly on that data.",
+      { width: pageWidth }
+    );
+  doc.moveDown(0.3);
+}
+
 /**
  * Builds a formatted, bank-ready credit assessment memo PDF for a single
  * MSME. Reads only from the already-computed profile/normalized/score/
@@ -126,7 +189,8 @@ export function buildCreditMemoDoc(
   profile: MSMEProfileMeta,
   normalized: NormalizedMSMEData,
   score: ScoreResult,
-  narrative: NarrativeResult
+  narrative: NarrativeResult,
+  mlRisk: MLRiskResult
 ): PDFKit.PDFDocument {
   const doc = new PDFDocument({
     size: "A4",
@@ -164,6 +228,9 @@ export function buildCreditMemoDoc(
   // ---- Pillar breakdown table ----
   sectionTitle(doc, "4-Pillar Score Breakdown");
   renderPillarTable(doc, score, pageWidth);
+
+  // ---- ML Risk Layer ----
+  renderMLRiskSection(doc, mlRisk, pageWidth);
 
   // ---- AI Narrative ----
   sectionTitle(doc, "AI Narrative (Underwriter Assessment)");

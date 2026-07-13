@@ -7,9 +7,11 @@ import { generateCopilotReply } from "../ai/copilot.js";
 import { buildCreditMemoDoc } from "../pdf/creditMemoPdf.js";
 import { buildOcenPayload } from "../ocen/ocenAdapter.js";
 import { getProfileMeta, MSME_PROFILES } from "../data/profiles.js";
+import { getMLRisk } from "../ml/mlClient.js";
 import type {
   AssessmentResponse,
   ChatMessage,
+  MLRiskBand,
   NormalizedMSMEData,
   PortfolioMsmeSummary,
   PortfolioSummary,
@@ -47,7 +49,8 @@ msmeRouter.get("/portfolio/summary", async (_req, res) => {
       MSME_PROFILES.map(async (profile) => {
         const normalized = await normalizeMSMEData(profile.id, adapter);
         const score = computeScore(normalized);
-        return { profile, score };
+        const mlRisk = await getMLRisk(normalized);
+        return { profile, score, mlRisk };
       })
     );
 
@@ -60,7 +63,7 @@ msmeRouter.get("/portfolio/summary", async (_req, res) => {
     };
     const businessTypeCounts: Record<string, number> = {};
 
-    const msmes: PortfolioMsmeSummary[] = entries.map(({ profile, score }) => {
+    const msmes: PortfolioMsmeSummary[] = entries.map(({ profile, score, mlRisk }) => {
       bandCounts[score.band] += 1;
       businessTypeCounts[profile.businessType] = (businessTypeCounts[profile.businessType] ?? 0) + 1;
       return {
@@ -70,6 +73,8 @@ msmeRouter.get("/portfolio/summary", async (_req, res) => {
         composite_score: score.composite_score,
         band: score.band,
         top_risk_flag: score.risk_flags[0] ?? null,
+        probability_of_default_pct: mlRisk.probability_of_default_pct,
+        ml_risk_band: mlRisk.risk_band,
       };
     });
 
@@ -81,10 +86,26 @@ msmeRouter.get("/portfolio/summary", async (_req, res) => {
     const highRiskCount = bandCounts.Poor + bandCounts.Bad;
     const highRiskPct = totalAssessed > 0 ? Math.round((highRiskCount / totalAssessed) * 1000) / 10 : 0;
 
+    // ML aggregates are computed only over MSMEs where the ML service was
+    // actually reachable, so a partial outage doesn't silently skew the
+    // portfolio-wide numbers.
+    const withPd = entries.filter((e) => e.mlRisk.available && e.mlRisk.probability_of_default_pct !== null);
+    const averagePd =
+      withPd.length > 0
+        ? Math.round(
+            (withPd.reduce((sum, e) => sum + (e.mlRisk.probability_of_default_pct ?? 0), 0) / withPd.length) * 10
+          ) / 10
+        : null;
+    const mlHighRiskBands: MLRiskBand[] = ["Elevated", "High"];
+    const mlHighRiskCount = withPd.filter((e) => mlHighRiskBands.includes(e.mlRisk.risk_band as MLRiskBand)).length;
+    const mlHighRiskPct = withPd.length > 0 ? Math.round((mlHighRiskCount / withPd.length) * 1000) / 10 : null;
+
     const summary: PortfolioSummary = {
       total_assessed: totalAssessed,
       average_composite_score: averageScore,
       high_risk_pct: highRiskPct,
+      average_pd_pct: averagePd,
+      ml_high_risk_pct: mlHighRiskPct,
       band_counts: bandCounts,
       business_type_counts: businessTypeCounts,
       msmes,
@@ -117,7 +138,7 @@ msmeRouter.get("/:id/ocen-payload", async (req, res) => {
   }
 });
 
-msmeRouter.post("/:id/simulate", (req, res) => {
+msmeRouter.post("/:id/simulate", async (req, res) => {
   const { id } = req.params;
   const profile = getProfileMeta(id);
   if (!profile) {
@@ -131,11 +152,13 @@ msmeRouter.post("/:id/simulate", (req, res) => {
   }
 
   try {
-    // Deliberately synchronous and adapter-free: computeScore() is a pure
-    // function, so scenario overrides can be scored instantly for live
-    // slider interactions without touching the network or the AI layer.
+    // computeScore() is pure/instant. The ML call adds real network
+    // latency, so it runs alongside it rather than blocking on it — the
+    // frontend can render the rule-engine score immediately and let the
+    // PD figure settle a beat later.
     const score = computeScore(req.body);
-    res.json(score);
+    const mlRisk = await getMLRisk(req.body);
+    res.json({ score, ml_risk: mlRisk });
   } catch (err) {
     console.error(`[simulate] failed for ${id}:`, err);
     res.status(500).json({ error: "Failed to simulate scenario." });
@@ -154,9 +177,10 @@ msmeRouter.get("/:id/memo", async (req, res) => {
     const adapter = getDataSourceAdapter();
     const normalized = await normalizeMSMEData(id, adapter);
     const score = computeScore(normalized);
-    const narrative = await generateNarrative(profile, normalized, score);
+    const mlRisk = await getMLRisk(normalized);
+    const narrative = await generateNarrative(profile, normalized, score, mlRisk);
 
-    const doc = buildCreditMemoDoc(profile, normalized, score, narrative);
+    const doc = buildCreditMemoDoc(profile, normalized, score, narrative, mlRisk);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="credit-memo-${id}.pdf"`);
@@ -196,8 +220,9 @@ msmeRouter.post("/:id/chat", async (req, res) => {
     const adapter = getDataSourceAdapter();
     const normalized = await normalizeMSMEData(id, adapter);
     const score = computeScore(normalized);
+    const mlRisk = await getMLRisk(normalized);
 
-    const chatResponse = await generateCopilotReply(profile, normalized, score, message, conversationHistory);
+    const chatResponse = await generateCopilotReply(profile, normalized, score, mlRisk, message, conversationHistory);
     res.json(chatResponse);
   } catch (err) {
     console.error(`[chat] failed for ${id}:`, err);
@@ -220,13 +245,19 @@ msmeRouter.post("/:id/assess", async (req, res) => {
 
     const normalized = await normalizeMSMEData(id, adapter);
     const score = computeScore(normalized);
-    const narrative = await generateNarrative(profile, normalized, score);
+
+    // ML risk resolves first (bounded by its own short timeout) because the
+    // narrative prompt is grounded on the PD + SHAP output — Claude should
+    // be able to reference the same numbers a credit officer sees.
+    const mlRisk = await getMLRisk(normalized);
+    const narrative = await generateNarrative(profile, normalized, score, mlRisk);
     const ocen = buildOcenPayload(id, normalized.data_sources_available, score);
 
     const response: AssessmentResponse = {
       profile,
       normalized,
       score,
+      ml_risk: mlRisk,
       narrative,
       ocen,
       data_mode: dataMode,

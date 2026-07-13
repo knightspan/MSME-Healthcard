@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { msmeRouter } from "./routes/msmeRoutes.js";
+import { scoreRouter } from "./routes/scoreRoutes.js";
 import { getDataMode } from "./adapters/DataSourceFactory.js";
 
 const app = express();
@@ -15,6 +16,10 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/msme", msmeRouter);
+// Ad-hoc scoring contract consumed by the RiskIntel MSME frontend's
+// "Interactive Risk Underwriter" form (as opposed to the fixed demo
+// profiles served under /api/msme).
+app.use("/api/v1", scoreRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });

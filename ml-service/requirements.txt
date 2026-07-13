@@ -1,0 +1,11 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+# Pinned: the committed model/xgb_pd_model.joblib was serialized with an
+# older XGBoost internal model format. Newer XGBoost (3.x) refuses to
+# deserialize it ("input stream corrupted"). 2.1.4 loads it cleanly. If you
+# retrain via train.py, this pin can be relaxed back to xgboost>=2.1.
+xgboost==2.1.4
+shap>=0.46
+scikit-learn>=1.5
+pandas>=2.2
+joblib>=1.4

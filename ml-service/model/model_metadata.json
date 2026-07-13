@@ -1,0 +1,29 @@
+{
+  "model_version": "gmsc-xgb-v1",
+  "trained_at": "2026-07-09T22:28:24Z",
+  "training_dataset": "Give Me Some Credit (Kaggle, 2011) \u2014 150,000 labelled borrowers",
+  "label": "SeriousDlqin2yrs (serious delinquency within 2 years)",
+  "feature_order": [
+    "RevolvingUtilizationOfUnsecuredLines",
+    "age",
+    "NumberOfTime30-59DaysPastDueNotWorse",
+    "DebtRatio",
+    "MonthlyIncome",
+    "NumberOfOpenCreditLinesAndLoans",
+    "NumberOfTimes90DaysLate",
+    "NumberRealEstateLoansOrLines",
+    "NumberOfTime60-89DaysPastDueNotWorse",
+    "NumberOfDependents"
+  ],
+  "train_auc": 0.8806,
+  "test_auc": 0.8698,
+  "n_train": 119999,
+  "n_test": 30000,
+  "positive_rate": 0.0668,
+  "risk_band_cuts_pct": {
+    "low_max_pct": 16.39,
+    "moderate_max_pct": 41.65,
+    "elevated_max_pct": 73.54
+  },
+  "disclaimer": "Trained on a public bureau-style credit dataset, not on IDBI's historical repayment or alternate-data records. Live MSME assessments are translated into this model's feature space via a documented alt-data bridge (see feature_mapping.py). In production this model would be retrained directly on IDBI's historical repayment and alternate-data records."
+}

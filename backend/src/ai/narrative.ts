@@ -1,4 +1,4 @@
-import type { MSMEProfileMeta, NarrativeResult, NormalizedMSMEData, ScoreResult } from "../types/index.js";
+import type { MLRiskResult, MSMEProfileMeta, NarrativeResult, NormalizedMSMEData, ScoreResult } from "../types/index.js";
 import { ANTHROPIC_MODEL, getAnthropicClient } from "./anthropicClient.js";
 
 const ANTHROPIC_TIMEOUT_MS = 4500; // keeps the overall /assess endpoint close to the <5s target
@@ -14,12 +14,14 @@ Strict rules:
 - "improvement_tips" must contain EXACTLY 2 specific, actionable recommendations the MSME could realistically take to raise their score.
 - The combined content across all fields should read like a concise 3-5 sentence underwriting memo — no more.
 - Do not use generic filler language such as "this business shows promise" or "further review is recommended".
-- Base every claim strictly on the data provided below. Never invent numbers or facts not present in the data.`;
+- Base every claim strictly on the data provided below. Never invent numbers or facts not present in the data.
+- If an ML probability-of-default figure is present in the data, you may reference it alongside the rule-based score, but always describe it as a demonstration model (bureau-style public dataset, alt-data bridged into its feature space) rather than a certified production PD.`;
 
 function buildUserPrompt(
   profile: MSMEProfileMeta,
   normalized: NormalizedMSMEData,
-  score: ScoreResult
+  score: ScoreResult,
+  mlRisk: MLRiskResult
 ): string {
   const payload = {
     business_name: profile.name,
@@ -37,6 +39,9 @@ function buildUserPrompt(
     normalized_data: normalized,
     risk_flags: score.risk_flags,
     strength_flags: score.strength_flags,
+    ml_probability_of_default: mlRisk.available ? mlRisk.probability_of_default_pct : null,
+    ml_risk_band: mlRisk.available ? mlRisk.risk_band : null,
+    ml_top_risk_drivers: mlRisk.available ? mlRisk.top_risk_increasing_features.map((f) => f.feature) : [],
   };
   return `Here is the MSME's financial health assessment data:\n\n${JSON.stringify(payload, null, 2)}\n\nWrite the underwriting memo JSON now.`;
 }
@@ -91,7 +96,8 @@ function tryParseNarrative(raw: string): NarrativeResult | null {
 export async function generateNarrative(
   profile: MSMEProfileMeta,
   normalized: NormalizedMSMEData,
-  score: ScoreResult
+  score: ScoreResult,
+  mlRisk: MLRiskResult
 ): Promise<NarrativeResult> {
   const anthropic = getAnthropicClient(ANTHROPIC_TIMEOUT_MS);
   if (!anthropic) {
@@ -103,7 +109,7 @@ export async function generateNarrative(
       model: ANTHROPIC_MODEL,
       max_tokens: 500,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserPrompt(profile, normalized, score) }],
+      messages: [{ role: "user", content: buildUserPrompt(profile, normalized, score, mlRisk) }],
     });
 
     const textBlock = message.content.find((block) => block.type === "text");

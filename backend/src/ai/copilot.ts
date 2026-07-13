@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatResponse,
+  MLRiskResult,
   MSMEProfileMeta,
   NormalizedMSMEData,
   ScoreResult,
@@ -21,7 +22,8 @@ const COPILOT_INSTRUCTIONS =
 export function buildCopilotSystemPrompt(
   profile: MSMEProfileMeta,
   normalized: NormalizedMSMEData,
-  score: ScoreResult
+  score: ScoreResult,
+  mlRisk: MLRiskResult
 ): string {
   const context = {
     business_name: profile.name,
@@ -35,11 +37,22 @@ export function buildCopilotSystemPrompt(
     risk_flags: score.risk_flags,
     strength_flags: score.strength_flags,
     normalized_data: normalized,
+    ml_risk_assessment: mlRisk.available
+      ? {
+          probability_of_default_pct: mlRisk.probability_of_default_pct,
+          risk_band: mlRisk.risk_band,
+          confidence_pct: mlRisk.confidence_pct,
+          model_version: mlRisk.model_version,
+          top_risk_increasing_features: mlRisk.top_risk_increasing_features,
+          top_risk_reducing_features: mlRisk.top_risk_reducing_features,
+          note: "This is a demonstration XGBoost model trained on a public bureau-style dataset (Give Me Some Credit) with alt-data mapped into its feature space via a documented heuristic bridge — not trained on IDBI's own repayment history. Present it as directional ML signal, not certified bureau-grade PD.",
+        }
+      : { available: false, note: "ML risk service was unavailable for this assessment; rely on the rule-based score and flags only." },
   };
 
   return `${COPILOT_INSTRUCTIONS}
 
-Here is the complete, up-to-date financial health assessment for this MSME. Treat this as the entire universe of facts you know about the business — do not reference anything outside of it:
+Here is the complete, up-to-date financial health assessment for this MSME, including the explainable rule-based score AND the XGBoost probability-of-default model's output with SHAP feature attributions. Treat this as the entire universe of facts you know about the business — do not reference anything outside of it. When asked "why shouldn't I approve" or similar, ground your answer in the specific risk_flags, top_risk_increasing_features, and pillar scores — never a generic answer:
 
 ${JSON.stringify(context, null, 2)}`;
 }
@@ -77,6 +90,7 @@ export async function generateCopilotReply(
   profile: MSMEProfileMeta,
   normalized: NormalizedMSMEData,
   score: ScoreResult,
+  mlRisk: MLRiskResult,
   message: string,
   conversationHistory: ChatMessage[] | undefined
 ): Promise<ChatResponse> {
@@ -90,7 +104,7 @@ export async function generateCopilotReply(
     const response = await anthropic.messages.create({
       model: ANTHROPIC_MODEL,
       max_tokens: 800,
-      system: buildCopilotSystemPrompt(profile, normalized, score),
+      system: buildCopilotSystemPrompt(profile, normalized, score, mlRisk),
       messages: [...history, { role: "user" as const, content: message }],
     });
 

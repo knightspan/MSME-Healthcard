@@ -97,6 +97,28 @@ export interface ScoreResult {
   reweight_note: string | null;
 }
 
+/** ---- ML risk layer output (XGBoost PD model + SHAP) ---- */
+
+export type MLRiskBand = "Low" | "Moderate" | "Elevated" | "High";
+
+export interface ShapFeatureContribution {
+  feature: string; // business-readable label
+  raw_feature?: string;
+  shap_value: number;
+  feature_value: number;
+}
+
+export interface MLRiskResult {
+  available: boolean; // false if the ML service was unreachable/timed out — pipeline degrades gracefully
+  probability_of_default_pct: number | null;
+  risk_band: MLRiskBand | null;
+  confidence_pct: number | null;
+  top_risk_increasing_features: ShapFeatureContribution[];
+  top_risk_reducing_features: ShapFeatureContribution[];
+  model_version: string | null;
+  fallback_reason: string | null;
+}
+
 /** ---- AI narrative layer output ---- */
 
 export interface NarrativeResult {
@@ -146,12 +168,16 @@ export interface PortfolioMsmeSummary {
   composite_score: number;
   band: ScoreBand;
   top_risk_flag: string | null;
+  probability_of_default_pct: number | null;
+  ml_risk_band: MLRiskBand | null;
 }
 
 export interface PortfolioSummary {
   total_assessed: number;
   average_composite_score: number;
   high_risk_pct: number; // % of MSMEs in the Poor or Bad bands
+  average_pd_pct: number | null; // null if ML service was unavailable for all MSMEs
+  ml_high_risk_pct: number | null; // % of MSMEs in the Elevated or High PD bands
   band_counts: Record<ScoreBand, number>;
   business_type_counts: Record<string, number>;
   msmes: PortfolioMsmeSummary[];
@@ -163,6 +189,7 @@ export interface AssessmentResponse {
   profile: MSMEProfileMeta;
   normalized: NormalizedMSMEData;
   score: ScoreResult;
+  ml_risk: MLRiskResult;
   narrative: NarrativeResult;
   ocen: OCENPayload;
   data_mode: "mock" | "live";

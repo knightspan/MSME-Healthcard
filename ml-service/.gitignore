@@ -1,0 +1,8 @@
+data/*.csv
+__pycache__/
+*.pyc
+.venv/
+
+# NOTE: model/*.joblib is intentionally NOT ignored — the trained model file
+# ships with the repo so the ML service works out of the box without
+# requiring the (not-included) training dataset to retrain it.
